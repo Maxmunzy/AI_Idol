@@ -76,6 +76,7 @@ artist_AI 개발 이력.
 ### Added
 - `system_design.md` 신규 — 전체 게임 시스템 설계 문서 (이후 §4.5 콘텐츠 파이프라인, §5.5 LLM 배우/감독 분리 추가)
 - `illustrator_brief.md` 신규 — 일러스트레이터 외주용 1페이지 brief (자금 마련 후 즉시 투입 대비)
+- `roadmap.md` 신규 — 3년 horizon 개인 로드맵 (Phase 0~5, 마인드셋용)
 - README — "기술적 의사결정" / "개발 과정" 섹션 추가
 - `CHANGELOG.md` 신규 (이 파일)
 

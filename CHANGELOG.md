@@ -1,53 +1,104 @@
-# 개발 이력
+# Changelog
 
-## 2026-05-26
-
-캐릭터부터 잡았다. 평행세계 작은 꽃들의 신, 조용하고 부드러운 톤, 말줄임표 많이. "나 너 없으면 안돼"가 핵심 정서. NAI로 외형 열두 번쯤 돌려서 락. 의상은 AI로 도저히 안 잡혀서 일러스트레이터 영역으로 미뤘다.
-
-시그니처 대사 30개 썼다. 첫만남, 일상, 감정, 의존성, 플러팅, 매력 여섯 카테고리. 시스템 프롬프트 v1이랑 가드레일까지 정리하고 12턴 돌려봤는데 톤은 의도대로 나왔다.
-
-Streamlit으로 챗 앱. Claude Sonnet 4.6 + Prompt Caching. Sonnet이 한국어 캐릭터 톤 제일 잘 잡고, 캐싱 붙이면 시스템 프롬프트 비용 90% 줄어든다.
-
-저녁에 ElevenLabs Voice Design으로 커스텀 보이스 만들고 v3로 통합. v2보다 v3가 한국어 운율 자연스럽다. VoiceSettings 튜닝하고 텍스트 전처리도 (괄호 안 행동묘사 제거, 말줄임표 처리, 양끝 padding).
-
-v3가 알파라 시작 머뭇거림 약하고 도치문 끝음 올라가는 거 있는데 일단 수용. 나중에 Supertone 같은 한국어 특화 쪽 보면 될 듯.
-
-v0.2 커밋.
-
-## 2026-05-27
-
-PostgreSQL 17 설치하고 SQLModel로 ORM. User, Message, Memory 모델. Memory는 RAG 쓸 때 위해 스키마만 먼저 만들어둠.
-
-사이드바에 사용자 이름 입력 칸 두고 입력하면 해당 사용자 대화 자동 로드. 멀티유저 됐다.
-
-SQLite 안 쓰고 PostgreSQL 간 건 production 가는 길이랑 pgvector 확장 때문. SQLModel은 type-safe라 코드 깔끔하다.
-
-v0.3 커밋.
-
-## 2026-05-28
-
-방향 크게 바꿨다. 챗봇 말고 AI 가상 아이돌 + 미연시 + 라이브서비스 하이브리드로. 짧은 프롤로그로 만나고 그 뒤로는 자유 대화에 주기적 이벤트 끼어드는 구조. 엔딩 없이 무한히 이야기 만들어감.
-
-호감도 0~100, 시작 40 (꽃이 너를 골랐다는 전제). LLM이 매 메시지 -10~+10 판정. 머리에 꽂은 꽃으로 시각화하기로. 숫자 게이지는 안 보이게. 호감도 0이면 게임오버. 메모리 완전 삭제하고 처음부터. 그것도 좋게 헤어지지 않게. 차갑게 떠나야 사용자가 진짜 조심한다.
-
-이벤트는 강제로 안 끼어든다. 조건 충족하면 알림만 뜨고 사용자가 누를 때 활성화. 트리거 5종 (시간, 호감도, 날씨, 조건, 랜덤).
-
-UI는 캐릭터 상단 고정 + 채팅 하단. 이벤트나 프롤로그 들어가면 VN 풀스크린.
-
-아키텍처는 모바일 우선. core/ Python 로직과 UI 분리. Streamlit은 throwaway. 나중에 그대로 FastAPI 백엔드 되고 모바일 앱(Flutter/RN) + FCM 푸시. DB는 PostgreSQL 서버에 SQLite 로컬 캐시 얹는 계층.
-
-system_design.md 새로 쓰고 README도 게임 방향으로 다 다시 썼다. 옛 챗봇 시절 내용 빼고.
-
-게임 시스템 설계 + README 갱신 커밋.
+artist_AI 개발 이력. 최신이 위.
 
 ---
 
-커밋 후 추가로 정리한 것들. 아직 system_design.md엔 반영 안 함.
+## 2026-05-28 — Day 3: 게임 시스템 설계 전환
 
-LLM 단일로 캐릭터 응답이랑 호감도 판정 동시에 하면 sycophancy 때문에 가스라이팅에 취약하다. 배우(Sonnet)랑 감독(Haiku) 분리하기로. 감독 쪽에 조작 패턴 명시 (가스라이팅, 네깅, 가치 폄하, 죄책감 부여, 책임 전가, 농담으로 reframe, 점수 조작 시도).
+방향 전환: 챗봇 → **AI 가상 아이돌 + 미연시 + 라이브서비스** 하이브리드.
+"엔딩 없이 둘이서 무한히 이야기 만들어가는" 관계 게임.
 
-판정은 v1 Haiku로 시작. 데이터 쌓이면 v2에서 KoBERT 파인튜닝 분류기로 갈아탈 계획. 분류 작업은 범용 LLM보다 파인튜닝이 빠르고 싸고 어뷰징에도 강함.
+### Added
+- `system_design.md` 신규 — 전체 게임 시스템 설계 문서
+- README — "기술적 의사결정" / "개발 과정" 섹션 추가
+- `CHANGELOG.md` 신규 (이 파일)
 
-콘텐츠는 구독 게이팅으로 무료/유료 나누고, 이벤트마다 일러스트 모으는 갤러리, 시즌/절차적 이벤트로 솔로 부담 분산.
+### Changed
+- README — 챗봇 정체성 → 게임 정체성으로 갱신
+- README — "현재 상태" 표 (구현됨 vs 설계만 명확히 구분)
 
-다음 세션에 system_design.md 반영 예정.
+### Removed (README)
+- 옛 "톤 튜닝 50회 자체 대화" 워크플로우
+- 옛 v0.1→v0.2 체크리스트 로드맵
+- 장황한 비용 디테일 표
+
+### 설계 결정 (system_design.md)
+- 상태 머신: 프롤로그 → Free Chat ⇄ 이벤트 (엔딩 없음, 무한 반복)
+- 호감도 (0~100, 시작 40, 머리 꽃으로 시각화)
+- 게임오버 (호감도 0 → 메모리 완전 삭제, 차갑게 떠남)
+- 이벤트 토글/알림 발동, 5종 트리거
+- 호감도 밴드 5종 + 스토리 분기
+- 모바일 우선 아키텍처 (core/ 로직 분리 → FastAPI → Flutter + FCM)
+- UI 하이브리드 (캐릭터 상단 고정 + 채팅, 2모드 자동 전환)
+- 자유 텍스트 입력 (선택지 X, LLM 즉각 반응 = AI-native VN)
+
+### 미반영 추가 결정 (다음 커밋 예정)
+- LLM 배우(Sonnet) / 감독(Haiku) 분리 (조작 방지)
+- 감독 평가 rubric (가스라이팅/네깅/가치폄하/죄책감/책임전가/농담reframe/점수조작 패턴 명시)
+- 진화 경로: v1 LLM 판정 → v2 KoBERT 파인튜닝 분류기
+- 콘텐츠 파이프라인 (구독 게이팅 + 이벤트별 일러스트 컬렉터블 + 시즌/절차적 이벤트)
+
+---
+
+## 2026-05-27 — Day 2 / v0.3: PostgreSQL 영속화
+
+### Added
+- `db.py` — SQLModel ORM (User / Message / Memory 모델)
+- 사이드바 "사용자 이름" 입력 → 사용자별 대화 자동 로드/저장
+- 앱 재시작 후 이전 대화 복원
+- `psycopg2-binary`, `sqlmodel` 의존성
+
+### Changed
+- `app.py` — DB 연동 + 멀티유저 지원
+- 사이드바: DB 누적 메시지 수, "다시 로드" / "대화 삭제" 버튼
+
+### 의사결정
+- PostgreSQL (SQLite 대신 production-grade, 향후 pgvector 확장)
+- SQLModel (Pydantic + SQLAlchemy 모던 ORM, type-safe)
+- Memory 테이블 — v2 RAG용 스키마 미리 정의 (현재 미사용)
+
+---
+
+## 2026-05-26 — Day 1 / v0.2: 음성 통합
+
+### Added
+- ElevenLabs v3 커스텀 보이스 통합 (TTS)
+- 음성 자동 재생 (`st.audio` autoplay)
+- VoiceSettings 튜닝 (stability=0.75, similarity_boost=0.85, style=0.15, speed=0.85)
+- 텍스트 전처리 (괄호 stage direction 제거, "..." 처리, 시작/끝 짤림 방지 padding)
+- 사이드바 TTS 사용량 모니터링
+- `elevenlabs` 의존성
+
+### Changed
+- 모델: `eleven_multilingual_v2` → `eleven_v3` (한국어 운율 자연스러움)
+
+### 의사결정
+- ElevenLabs Voice Design (성우 외주 없이 커스텀 보이스)
+- v3 alpha 한계 수용 (시작 머뭇거림 약함, 한국어 도치문 톤 한계) → 향후 Supertone 검토
+
+---
+
+## 2026-05-26 — Day 1 / v0.1: 캐릭터 + 챗 MVP
+
+### Added
+- 캐릭터 시트 v1.2 (`yuran_character_sheet.md`)
+  - lore (평행세계 작은 꽃들의 신)
+  - 톤 (조용함, 부드러움, 짧은 문장, 말줄임표)
+  - "나 너 없으면 안돼" 의존성 정서 (트라우마 기반, dignity 유지)
+  - 외형 spec (NAI 12회 검증 후 락)
+  - 가드레일 (성적/만남/AI 정체/다른 캐릭터 흉내)
+- 시그니처 대사 30개 (`yuran_signature_dialogues.md`) — 6 카테고리 (첫만남/일상/감정/의존성/플러팅/매력)
+- 시스템 프롬프트 v1 (`yuran_system_prompt_v1.md`)
+- NAI 비주얼 reference 3장 (외형 락 / 의상 미정 — 일러스트레이터 영역)
+- Streamlit 챗 앱 (`app.py`) — Claude Sonnet 4.6 + Prompt Caching
+- 사이드바 비용 모니터링 (실시간 토큰 + KRW 환산)
+
+### 검증
+- 12턴 자체 대화 → 시그니처 모먼트 정확히 트리거
+- 가드레일 응답이 캐릭터 톤 유지 확인 (메타 발언 X)
+
+### 의사결정
+- Claude Sonnet 4.6 (한국어 캐릭터 톤 가장 강함)
+- Prompt Caching (시스템 프롬프트 ~3.5K 토큰 → 메시지당 비용 90% 절감)
+- Streamlit (빠른 프로토타입, throwaway 전제 — 실서비스는 모바일)

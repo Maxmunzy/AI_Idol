@@ -1,6 +1,6 @@
 # Changelog
 
-artist_AI 개발 이력. 오래된 것이 위.
+artist_AI 개발 이력.
 
 ---
 

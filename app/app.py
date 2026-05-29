@@ -8,7 +8,10 @@
 
 import os
 import re
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
 
 import anthropic
 import streamlit as st
@@ -27,7 +30,7 @@ from db import (
 load_dotenv()
 
 
-SYSTEM_PROMPT_FILE = Path(__file__).parent / "yuran_system_prompt_v1.md"
+SYSTEM_PROMPT_FILE = Path(__file__).parent.parent / "docs" / "yuran_system_prompt_v3.md"
 MODEL = "claude-sonnet-4-6"
 TTS_MODEL = "eleven_v3"
 MAX_HISTORY_TURNS = 20

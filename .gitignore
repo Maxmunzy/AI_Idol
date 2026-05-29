@@ -5,3 +5,13 @@ __pycache__/
 .venv/
 venv/
 .claude/
+
+# 모델 가중치 (크기 큼, HF 또는 외부 저장소로 배포)
+data/models/
+
+# 외부 데이터 (라이선스 회색 zone, 로컬 보관만)
+data/raw/external/
+
+# 임시 파일
+_tmp_*
+*.zip

@@ -1,13 +1,14 @@
 """
-유란 MVP 챗 앱 v0.3 - PostgreSQL 영속화 추가
+유란 MVP 챗 앱 v0.4 — UI 흐름 (얇은 컨트롤러)
 
-- Claude Sonnet 4.6 + Prompt Caching (LLM)
-- ElevenLabs v3 TTS (음성)
-- PostgreSQL via SQLModel (대화 영속화)
+모듈 분리:
+- llm.py:      Anthropic 클라이언트 + 시스템 프롬프트
+- tts.py:      ElevenLabs TTS
+- director.py: 하이브리드 감독 (KoBERT + Haiku)
+- db.py:       SQLModel + DB 헬퍼
 """
 
 import os
-import re
 import sys
 from pathlib import Path
 
@@ -16,7 +17,6 @@ sys.path.insert(0, str(Path(__file__).parent))
 import anthropic
 import streamlit as st
 from dotenv import load_dotenv
-from elevenlabs import ElevenLabs, VoiceSettings
 
 from db import (
     clear_messages,
@@ -26,95 +26,43 @@ from db import (
     load_messages,
     save_message,
 )
+from llm import MAX_HISTORY_TURNS, MODEL, get_anthropic_client, load_system_prompt
+from tts import generate_speech, get_elevenlabs_client, preprocess_for_tts
+
 
 load_dotenv()
 
 
-SYSTEM_PROMPT_FILE = Path(__file__).parent.parent / "docs" / "yuran_system_prompt_v3.md"
-MODEL = "claude-sonnet-4-6"
-TTS_MODEL = "eleven_v3"
-MAX_HISTORY_TURNS = 20
 DEFAULT_USERNAME = "guest"
-
-
-@st.cache_data
-def load_system_prompt() -> str:
-    """yuran_system_prompt_v1.md 에서 SYSTEM PROMPT 코드 블록만 추출."""
-    text = SYSTEM_PROMPT_FILE.read_text(encoding="utf-8")
-    match = re.search(
-        r"## SYSTEM PROMPT \(복붙\)\s*\n+```\s*\n(.*?)\n```", text, re.DOTALL
-    )
-    if not match:
-        st.error("yuran_system_prompt_v1.md 에서 시스템 프롬프트 못 찾음.")
-        st.stop()
-    return match.group(1).strip()
-
-
-VOICE_SETTINGS = VoiceSettings(
-    stability=0.75,
-    similarity_boost=0.85,
-    style=0.15,
-    use_speaker_boost=True,
-    speed=0.85,
-)
-
-
-def preprocess_for_tts(text: str) -> str:
-    """TTS용 텍스트 전처리 (ElevenLabs v3)."""
-    cleaned = re.sub(r"\([^)]*\)", "", text)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-
-    if not cleaned:
-        return ""
-
-    starts_with_hesitation = cleaned.startswith("...") or cleaned.startswith("…")
-    if starts_with_hesitation:
-        cleaned = re.sub(r"^[.…\s]+", "", cleaned)
-        cleaned = "...... ... " + cleaned
-
-    if cleaned[-1] not in ".!?":
-        cleaned += "."
-
-    cleaned = ". " + cleaned + " ."
-    return cleaned
-
-
-def get_anthropic_client() -> anthropic.Anthropic:
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        st.error("ANTHROPIC_API_KEY 누락 - .env 확인")
-        st.stop()
-    return anthropic.Anthropic(api_key=api_key)
-
-
-def get_elevenlabs_client() -> ElevenLabs:
-    api_key = os.getenv("ELEVENLABS_API_KEY")
-    if not api_key:
-        st.error("ELEVENLABS_API_KEY 누락 - .env 확인")
-        st.stop()
-    return ElevenLabs(api_key=api_key)
-
-
-def generate_speech(client: ElevenLabs, voice_id: str, text: str) -> bytes:
-    """텍스트를 음성으로 변환."""
-    clean_text = preprocess_for_tts(text)
-    if not clean_text:
-        return b""
-    audio_iterator = client.text_to_speech.convert(
-        voice_id=voice_id,
-        text=clean_text,
-        model_id=TTS_MODEL,
-        output_format="mp3_44100_128",
-        voice_settings=VOICE_SETTINGS,
-    )
-    return b"".join(audio_iterator)
+AFFECTION_START = 40  # system_design.md §5
 
 
 @st.cache_resource
 def setup_db():
-    """앱 시작 시 1회 DB 초기화."""
     init_db()
     return True
+
+
+@st.cache_data
+def cached_system_prompt() -> str:
+    return load_system_prompt()
+
+
+@st.cache_resource
+def cached_anthropic_client() -> anthropic.Anthropic:
+    return get_anthropic_client()
+
+
+@st.cache_resource
+def cached_elevenlabs_client():
+    return get_elevenlabs_client()
+
+
+@st.cache_resource
+def load_director(_client):
+    """하이브리드 감독 1회 로드 (KoBERT 가중치 메모리에 상주)."""
+    from director import HybridDirector
+    return HybridDirector(_client)
 
 
 setup_db()
@@ -151,11 +99,16 @@ if "user_id" not in st.session_state:
     st.session_state.user_id = None
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "affection" not in st.session_state:
+    st.session_state.affection = 40  # 시작값 (system_design.md)
+if "last_judgment" not in st.session_state:
+    st.session_state.last_judgment = None
 
 
-SYSTEM_PROMPT = load_system_prompt()
-anthropic_client = get_anthropic_client()
-elevenlabs_client = get_elevenlabs_client()
+SYSTEM_PROMPT = cached_system_prompt()
+anthropic_client = cached_anthropic_client()
+director = load_director(anthropic_client)
+elevenlabs_client = cached_elevenlabs_client()
 VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID")
 if not VOICE_ID:
     st.error("ELEVENLABS_VOICE_ID 누락 - .env 확인")
@@ -163,8 +116,21 @@ if not VOICE_ID:
 
 
 with st.sidebar:
-    st.markdown("### 🌸 유란 v0.3")
-    st.caption("Claude Sonnet 4.6 + ElevenLabs v3 + PostgreSQL")
+    st.markdown("### 🌸 유란 v0.4")
+    st.caption("Sonnet 4.6 (배우) + Haiku 4.5/KoBERT v1 (감독) + ElevenLabs v3 + PostgreSQL")
+
+    st.divider()
+    st.markdown("#### 호감도")
+    st.metric("현재", f"{st.session_state.affection}/100")
+    if st.session_state.last_judgment:
+        j = st.session_state.last_judgment
+        st.caption(
+            f"마지막 변화: **{j['delta']:+d}** (source: {j['source']})"
+        )
+        if j.get("pattern"):
+            st.caption(f"패턴: **{j['pattern']}**")
+        st.caption(f"이유: {j['reason']}")
+        st.caption(f"KoBERT prob: {j.get('kobert_prob', 0):.3f}")
 
     st.divider()
     st.markdown("#### 사용자")
@@ -274,6 +240,19 @@ if user_input := st.chat_input("말 걸어보세요..."):
             "audio": audio_bytes if audio_bytes else None,
         }
     )
+
+    # 감독 호출 — 유저 메시지에 대한 호감도 변화 판정
+    try:
+        judgment = director.predict(
+            last_user_msg=user_input,
+            history=history,
+            last_yuran_msg=full_response,
+        )
+        new_affection = max(0, min(100, st.session_state.affection + judgment["delta"]))
+        st.session_state.affection = new_affection
+        st.session_state.last_judgment = judgment
+    except Exception as e:
+        st.warning(f"감독 판정 실패: {e}")
 
 
 with st.sidebar:

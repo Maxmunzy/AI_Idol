@@ -211,3 +211,73 @@ artist_AI 개발 이력.
 - **이유**: 일반화 ↑ + 외움 X + INFJ 직관으로 더 자연스러운 거절 + §5.5 분리 정신 회복
 - 기억조작/DARVO 굴복은 의도된 결과 — 감독이 처리하는 시스템 그림 작동
 - UX 우려 (유저 헷갈림): Phase 5+ 게임 엔진 구현 시 "감독 → 배우 context hint 전달"로 해결
+
+---
+
+## 2026-05-30~31 — Day 5 / v0.6: KorEmpathetic 데이터 + 4 모델 구조 비교
+
+### Added
+- `prototype/build_dataset_v3.py` — 4 클래스 (normal/positive/vulnerable/manipulation) 데이터 빌드
+  - manipulation: eoh9 (1,698)
+  - positive: KorEmpathetic 긍정 14감정 user_id 0 첫발화 (10,379)
+  - vulnerable: KorEmpathetic 약함 11감정 user_id 0 첫발화 (8,128)
+  - normal: ChatbotData + NLPBada + gf-persona (9,259)
+  - 총 29,464 (B 옵션 — emotion 라벨 노이지 줄이려 첫 발화만)
+- `prototype/train_compare_v3.ipynb` — 4가지 모델 구조 동시 학습 + 비교
+- `prototype/inspect_hf_v2.py` — 새 데이터셋 schema 확인
+- `prototype/compare_v3_results.csv` — 4 모델 비교 결과
+- `data/models/v3_cascade_s1/`, `v3_cascade_s2/` — Cascade 학습 가중치 (gitignore)
+- `prototype/sequences.jsonl` — 21 케이스 (이미 있음, 평가용 재사용)
+
+### Changed
+- `app/director.py` — `DELTA_NORMAL = 0` → `DELTA_NORMAL = 1` (정상 메시지 호감도 회복 가능)
+
+### Removed
+- `prototype/build_dataset_v2.py`, `train_colab_v2.ipynb` (junidude14 multi-class, 노이지로 폐기)
+- `prototype/inspect_hf_datasets.py`, `filter_nsfw.py`, `split_for_curation.py` (검수용, 미사용)
+- `prototype/curation/` 폴더 전체 (v3은 KorEmpathetic 기반이라 사용 안 함)
+- `data/models/gaslight_klue_roberta_v2_multiclass/` (v2 multi-class 모델, 폐기)
+- `prototype/dataset_v2*.csv`, `eval_21cases_v2_results.*` (v2 산출물)
+
+### 검증 (4 모델 구조 비교)
+
+| 구조 | 모델 수 | Test acc | Macro F1 | 21케이스 OOD binary |
+|---|---|---|---|---|
+| Multi-class | 1 | 0.9126 | 0.9159 | 0.667 (14/21) |
+| Cascade | 2 | 0.9116 | 0.9084 | **0.714** (15/21) |
+| Ensemble | 4 | **0.9140** | 0.9157 | **0.714** (15/21) |
+| Multi-task | 1+heads | 0.9051 | 0.9108 | **0.714** (15/21) |
+
+**핵심 발견**:
+- Test acc 모두 ~0.91 (in-distribution 비슷)
+- 21 OOD: Multi-class만 0.667, 나머지 3개 0.714 동률
+- **v1 binary (0.81) 보다 모두 낮음** — 4 클래스 분류 = 어려운 task
+- v3의 트레이드오프: 정확도 약간 손해 vs 호감도 차등 가능 (긍정/약함/평문 분리)
+
+### 한계 발견 (다음 세션 작업거리)
+
+**컨텍스트 의존성** — 같은 메시지도 이전 대화 맥락에 따라 의미 다름:
+- "너 때문이야" (농담 컨텍스트) ≠ "너 때문이야" (가스라이팅 시퀀스)
+- 단일 메시지 분류로는 본질적 한계 — 0.71 OOD가 single-turn 천장에 가까움
+- 해결: 컨텍스트 분류기 v4 (BERT sentence-pair, context + current_msg)
+- API 의존 회피 → 자체 컨텍스트 모델 학습 path 결정
+
+### 데이터셋 라이선스 / 출처
+
+- KorEmpatheticDialogues (passing2961, HF) — CC-BY-NC-4.0 (prototype OK, 상업 회색)
+- NLPBada/korean-persona-chat-dataset — MIT ✅
+- huggingface-KREW/korean-role-playing/gf-persona — 그대로 유지
+- 폐기: junidude14 (단일 캐릭터 "하정" + 19금 11%, 학습 데이터 부적합으로 확인)
+
+### 메모리 (사용자 피드백)
+- "무조건 긍정 금지" — 단점/대안/비판 솔직히
+- "검증부터" — 데이터/모델/통합/배포 전 분포·정확도·OOD·sanity check 의무
+- "사용자 시간 걱정 X" — 종료/시작은 사용자 결정
+
+### 의사결정
+- **C 적용**: director.py 정상 메시지 +1 (호감도 회복 가능, v1 KoBERT 그대로 사용)
+- **데이터 변경**: junidude14 폐기 + KorEmpathetic + NLPBada (다양 화자, MIT/CC)
+- **클래스 변경**: 4 클래스 (normal/positive/vulnerable/manipulation)
+- **B 옵션**: KorEmpathetic의 user_id 0 첫 발화만 추출 (노이지 ↓)
+- **v3 분류기는 production 대기**: 21 OOD 0.71이 v1 binary 0.81보다 낮아서 통합 보류
+- **다음 단계**: v4 컨텍스트 분류기 자체 학습 (Phase 0~3 API 의존 0 목표)

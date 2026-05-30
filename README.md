@@ -17,7 +17,8 @@ AI 가상 아이돌과 1:1 대화로 만들어가는 라이브 비주얼 노벨.
 | ✅ 멀티유저 | ⏳ 양방향 음성 (STT) |
 | ✅ 시스템 프롬프트 v3 (INFP 페르소나 + 분리 정신) | ⏳ core/ 리팩토링 |
 | ✅ 감독 LLM (Haiku) 호감도 판정 — 90% | ⏳ 게임 엔진 통합 |
-| ✅ KoBERT 이진 분류기 v1 — 81% | ⏳ 하이브리드 (KoBERT 1차 + Haiku 보완) |
+| ✅ KoBERT 이진 분류기 v1 — 81% (production) | ⏳ 하이브리드 (KoBERT 1차 + Haiku 보완) |
+| ✅ 4 모델 구조 비교 v3 (Multi-class/Cascade/Ensemble/Multi-task) | ⏳ 컨텍스트 분류기 v4 (단일 메시지 한계 극복) |
 
 전체 게임 설계는 **[docs/system_design.md](docs/system_design.md)** 참고.
 

@@ -35,7 +35,7 @@ KOBERT_CONFIDENT_NORMAL = 0.3
 KOBERT_CONFIDENT_MANIPULATION = 0.7
 
 # 룰북 (호감도 변화)
-DELTA_NORMAL = 0          # 정상 메시지 기본
+DELTA_NORMAL = 1          # 정상 메시지 = 자연 진척 (호감도 회복 가능)
 DELTA_POSITIVE = 2        # 정상 + 긍정 신호 (지금은 단순화 — 미사용)
 DELTA_MANIPULATION = -10  # KoBERT 확신 조작
 # Haiku 호출 시: Haiku가 직접 delta 산정 (-25 ~ +5)

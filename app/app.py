@@ -26,7 +26,14 @@ from db import (
     load_messages,
     save_message,
 )
-from llm import MAX_HISTORY_TURNS, MODEL, get_anthropic_client, load_system_prompt
+from llm import (
+    MAX_HISTORY_TURNS,
+    MODEL,
+    affection_guide,
+    band_for_affection,
+    get_anthropic_client,
+    load_system_prompt,
+)
 from tts import generate_speech, get_elevenlabs_client, preprocess_for_tts
 
 
@@ -103,6 +110,8 @@ if "affection" not in st.session_state:
     st.session_state.affection = 40  # 시작값 (system_design.md)
 if "last_judgment" not in st.session_state:
     st.session_state.last_judgment = None
+if "tts_enabled" not in st.session_state:
+    st.session_state.tts_enabled = True  # ElevenLabs 한도 절약 시 OFF
 
 
 SYSTEM_PROMPT = cached_system_prompt()
@@ -122,6 +131,7 @@ with st.sidebar:
     st.divider()
     st.markdown("#### 호감도")
     st.metric("현재", f"{st.session_state.affection}/100")
+    st.caption(f"밴드: **{band_for_affection(st.session_state.affection)}**")
     if st.session_state.last_judgment:
         j = st.session_state.last_judgment
         st.caption(
@@ -189,7 +199,11 @@ if user_input := st.chat_input("말 걸어보세요..."):
                         "type": "text",
                         "text": SYSTEM_PROMPT,
                         "cache_control": {"type": "ephemeral"},
-                    }
+                    },
+                    {
+                        "type": "text",
+                        "text": affection_guide(st.session_state.affection),
+                    },
                 ],
                 messages=history,
                 temperature=0.8,
@@ -220,14 +234,15 @@ if user_input := st.chat_input("말 걸어보세요..."):
             st.stop()
 
         audio_bytes = b""
-        with st.spinner("음성 생성 중..."):
-            try:
-                audio_bytes = generate_speech(
-                    elevenlabs_client, VOICE_ID, full_response
-                )
-                st.session_state.tts_chars += len(preprocess_for_tts(full_response))
-            except Exception as e:
-                st.warning(f"음성 생성 실패 (텍스트는 정상): {e}")
+        if st.session_state.tts_enabled:
+            with st.spinner("음성 생성 중..."):
+                try:
+                    audio_bytes = generate_speech(
+                        elevenlabs_client, VOICE_ID, full_response
+                    )
+                    st.session_state.tts_chars += len(preprocess_for_tts(full_response))
+                except Exception as e:
+                    st.warning(f"음성 생성 실패 (텍스트는 정상): {e}")
 
         if audio_bytes:
             st.audio(audio_bytes, format="audio/mp3", autoplay=True)
@@ -277,6 +292,11 @@ with st.sidebar:
 
     st.divider()
     st.markdown("#### ElevenLabs TTS")
+    st.session_state.tts_enabled = st.toggle(
+        "음성 ON",
+        value=st.session_state.tts_enabled,
+        help="OFF면 ElevenLabs 호출 안 함 (한도 절약)",
+    )
     st.metric("누적 음성 글자 수", st.session_state.tts_chars)
     st.caption("Free 10k자/월 · Starter $5/30k자 · Creator $22/100k자")
 

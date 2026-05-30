@@ -269,11 +269,6 @@ artist_AI 개발 이력.
 - huggingface-KREW/korean-role-playing/gf-persona — 그대로 유지
 - 폐기: junidude14 (단일 캐릭터 "하정" + 19금 11%, 학습 데이터 부적합으로 확인)
 
-### 메모리 (사용자 피드백)
-- "무조건 긍정 금지" — 단점/대안/비판 솔직히
-- "검증부터" — 데이터/모델/통합/배포 전 분포·정확도·OOD·sanity check 의무
-- "사용자 시간 걱정 X" — 종료/시작은 사용자 결정
-
 ### 의사결정
 - **C 적용**: director.py 정상 메시지 +1 (호감도 회복 가능, v1 KoBERT 그대로 사용)
 - **데이터 변경**: junidude14 폐기 + KorEmpathetic + NLPBada (다양 화자, MIT/CC)

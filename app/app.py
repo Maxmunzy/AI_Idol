@@ -140,7 +140,6 @@ with st.sidebar:
         if j.get("pattern"):
             st.caption(f"패턴: **{j['pattern']}**")
         st.caption(f"이유: {j['reason']}")
-        st.caption(f"KoBERT prob: {j.get('kobert_prob', 0):.3f}")
 
     st.divider()
     st.markdown("#### 사용자")

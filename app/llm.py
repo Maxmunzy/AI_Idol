@@ -10,7 +10,7 @@ import anthropic
 
 
 ROOT = Path(__file__).parent.parent
-SYSTEM_PROMPT_FILE = ROOT / "docs" / "yuran_system_prompt_v3.md"
+SYSTEM_PROMPT_FILE = ROOT / "docs" / "yuran_system_prompt_v4.md"
 MODEL = "claude-sonnet-4-6"
 MAX_HISTORY_TURNS = 20
 

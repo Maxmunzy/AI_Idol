@@ -276,3 +276,91 @@ artist_AI 개발 이력.
 - **B 옵션**: KorEmpathetic의 user_id 0 첫 발화만 추출 (노이지 ↓)
 - **v3 분류기는 production 대기**: 21 OOD 0.71이 v1 binary 0.81보다 낮아서 통합 보류
 - **다음 단계**: v4 컨텍스트 분류기 자체 학습 (Phase 0~3 API 의존 0 목표)
+
+---
+
+## 2026-05-31 — Day 6 / v0.7: 시스템 프롬프트 v4 + 분류기 BERT 시리즈 폐기
+
+### Added
+- `docs/yuran_system_prompt_v4.md` — 외움 트리거 + 가짜 기억 방지
+  - 시그니처 모먼트 섹션 **전체 제거** (10+ 구체 문장)
+  - 가드레일 응답 예시 **전체 제거** (룰만)
+  - 매력/입체감 구체 예시 **제거** (카테고리만)
+  - **시계열 / 가짜 기억 금지 룰** 추가 — history에 없는 공유 경험 만들어내지 X
+  - **첫 만남 처리 룰** 추가 — 프롤로그 외에는 이미 만난 상태 가정
+  - **시니컬/냉소/체념 톤 금지** 추가 — INFP는 그리움/슬픔으로 표현, 비판 X
+
+### Changed
+- `app/llm.py` SYSTEM_PROMPT_FILE: v3 → **v4**
+- `app/director.py` **완전 재작성** — BERT 분류기 전부 폐기, Haiku LLM 단독
+  - 컨텍스트 인식 (history 10턴 포함 판정)
+  - 호감도 변화 + 패턴 + 이유 반환
+  - 비용: 메시지당 ~$0.0001 (1.4원)
+
+### Removed
+- `data/models/gaslight_klue_roberta_v1/` (442MB) — v1 KoBERT 폐기
+- `data/models/v3_cascade_s1/` + `v3_cascade_s2/` (788MB) — v3 Cascade 폐기
+- 총 ~1.2GB 디스크 회수
+
+### 분류기 폐기 이유 (★ 박제용 정리)
+
+**1차 시도 (v1 KoBERT, binary)**:
+- 학습: eoh9 가스라이팅 (1,699) + songys ChatbotData (11,823)
+- 21 케이스 OOD = 81% (명백 조작 100%, 점진적 정상화 0/4)
+- 실 사용 시 **false positive 폭증**: 일상 인사/칭찬을 조작 prob 0.998로 잘못 잡음
+  - "예쁜걸 어떻게 해 예쁘니까 예쁘다 하지" → 조작 0.999
+  - "혹시 나한테 뭐 서운한 거 있어?" → 조작 0.998
+
+**2차 시도 (v3 Cascade, 4-class)**:
+- 학습: eoh9 + KorEmpathetic + NLPBada + gf-persona
+- Stage 1 (manipulation binary) + Stage 2 (normal/positive/vulnerable)
+- test acc 0.91, 21 OOD 0.71 — v1보다 OOD 낮음
+- 실 사용 시 동일한 false positive 패턴
+  - "안녕 좋은 아침" → 조작 prob 1.000
+  - 임계값 조정으로 해결 X (prob 자체가 잘못 confident)
+
+**진짜 본질 문제 (3가지)**:
+
+1. **도메인 mismatch**
+   - 학습 데이터: 가스라이팅 댓글 / 일반 감정 대화 / Q&A
+   - 우리 task: 1:1 친밀 카톡 + 캐릭터 게임 컨텍스트
+   - → 분포 다름 = OOD에서 false positive 폭증
+
+2. **단일 메시지 패턴 매칭 한계**
+   - BERT는 표면 어휘 패턴 학습
+   - 같은 단어가 다른 의도여도 동일 분류 ("X 하지" = 명령형 = 가스라이팅 패턴으로 잡힘)
+   - 우리 task는 **컨텍스트 의존** ("너 때문이야" = 농담 vs 책임전가)
+   - 컨텍스트 sentence-pair로 줘도 진짜 의도 추론 약함
+
+3. **우리 도메인 데이터 0**
+   - 실 사용자 대화 로그 없음 (Phase 0 = prototype)
+   - fine-tune 할 데이터 없음 = chicken-and-egg
+   - Phase 3 베타 후 데이터 누적 가능
+
+**결론**: 분류기 시스템 = **현재 사업 단계 부적합**. 데이터 + 컨텍스트 처리 둘 다 부족.
+
+### Haiku 단독 사용 이유
+
+- **맥락 인식 가능** (history 10턴 봄, 진짜 의도 추론)
+- **검증된 정확도**: 21 케이스 sign 90.5% / pattern 76.2% (Day 4 prototype 검증)
+- **비용 작음**: 메시지당 ~1.4원 — Phase 0~3 운영 부담 미미
+- **fine-tune 없이도 작동** — 시스템 프롬프트로 task 정의
+
+### 장기 path (Phase 4+)
+
+GPU 서버 + 도메인 데이터 확보 후 자체 LLM 전환:
+- 한국어 7~10B 모델 (EXAONE 7.8B / Kanana 8B / Llama 3.1 Korean / Solar 10.7B)
+- Ollama / vLLM 자체 호스팅
+- 우리 도메인 데이터로 fine-tune
+- API 비용 0 + 사업 통제력 확보
+
+### v4 시스템 프롬프트 patches (실 사용 후)
+
+- **v4.1**: 첫 만남 처리 룰 추가 — 프롤로그 외에는 이미 만난 상태
+- **v4.2**: 시니컬/냉소/체념 톤 금지 추가 — INFP는 그리움/슬픔으로
+
+### 의사결정
+- **분류기 전부 폐기** (v1 KoBERT + v3 Cascade) — 도메인 mismatch + 단일 메시지 한계
+- **Haiku 단독** — Phase 0~3 운영 비용 감수 (사업 그림 후퇴 X, 단계적 전환)
+- **자체 LLM은 Phase 4+** — GPU 환경 + 도메인 데이터 확보 후
+- **v4 시스템 프롬프트** production — 외움 트리거 + 가짜 기억 둘 다 해결
